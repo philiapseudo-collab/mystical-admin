@@ -1,0 +1,578 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StaffRole {
+  ADMIN
+  OPS
+  FINANCE
+}
+
+enum PackageVisibility {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DepartureStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  COMPLETED
+  CANCELLED
+}
+
+enum DepartureReservationStatus {
+  HOLD
+  CONFIRMED
+  CANCELLED
+  RELEASED
+}
+
+enum PaymentChannel {
+  PESAPAL
+  MPESA_MANUAL
+  BANK_TRANSFER
+  CASH
+  OFFICE_CARD
+  OTHER
+}
+
+enum VendorStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ExpenseStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum AnalyticsEventType {
+  VISIT
+  PAGE_VIEW
+  PACKAGE_VIEW
+  INQUIRY_START
+  CHECKOUT_START
+  INVOICE_CREATED
+  PAYMENT_COMPLETED
+}
+
+model Booking {
+  id                    String                 @id @default(uuid())
+  bookingReference      String                 @unique
+  channel               String                 @default("website")
+  catalogPackageId      String?
+  departureId           String?
+  items                 Json
+  guestDetails          Json
+  priceBreakdown        Json
+  status                String                 @default("inquiry")
+  paymentStatus         String                 @default("pending")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  catalogPackage        CatalogPackage?        @relation(fields: [catalogPackageId], references: [id], onDelete: SetNull)
+  departure             Departure?             @relation(fields: [departureId], references: [id], onDelete: SetNull)
+  lead                  Lead?
+  quotes                Quote[]
+  invoices              Invoice[]
+  paymentAttempts       PaymentAttempt[]
+  departureReservations DepartureReservation[]
+  manualPayments        ManualPayment[]
+  expenseAllocations    ExpenseAllocation[]
+  analyticsEvents       AnalyticsEvent[]
+
+  @@index([bookingReference])
+  @@index([status])
+  @@index([catalogPackageId])
+  @@index([departureId])
+  @@map("bookings")
+}
+
+model Lead {
+  id          String    @id @default(uuid())
+  source      String    @default("CONTACT")
+  status      String    @default("NEW")
+  firstName   String?
+  lastName    String?
+  fullName    String?
+  email       String
+  phone       String?
+  subject     String?
+  destination String?
+  travelType  String?
+  travelers   Int?
+  travelStart DateTime?
+  message     String?
+  preferences Json?
+  metadata    Json?
+  bookingId   String?   @unique
+  booking     Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([source])
+  @@index([status])
+  @@index([email])
+  @@map("leads")
+}
+
+model Quote {
+  id                String    @id @default(uuid())
+  bookingId         String
+  booking           Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  quoteNumber       String    @unique
+  status            String    @default("quoted")
+  currency          String    @default("KES")
+  totalAmount       Float
+  depositPercentage Float     @default(30)
+  depositAmount     Float
+  balanceAmount     Float
+  lineItems         Json
+  notes             String?
+  expiresAt         DateTime?
+  approvedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  invoices          Invoice[]
+
+  @@index([bookingId])
+  @@index([quoteNumber])
+  @@index([status])
+  @@map("quotes")
+}
+
+model Invoice {
+  id             String           @id @default(uuid())
+  quoteId        String
+  quote          Quote            @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  bookingId      String
+  booking        Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  invoiceNumber  String           @unique
+  type           String           @default("DEPOSIT")
+  status         String           @default("issued")
+  currency       String           @default("KES")
+  totalAmount    Float
+  dueAmount      Float
+  paidAmount     Float            @default(0)
+  dueDate        DateTime?
+  issuedAt       DateTime?
+  paidAt         DateTime?
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  attempts       PaymentAttempt[]
+  manualPayments ManualPayment[]
+
+  @@index([quoteId])
+  @@index([bookingId])
+  @@index([invoiceNumber])
+  @@index([status])
+  @@map("invoices")
+}
+
+model PaymentAttempt {
+  id                        String         @id @default(cuid())
+  bookingId                 String
+  booking                   Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  invoiceId                 String
+  invoice                   Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  provider                  String         @default("PESAPAL")
+  status                    String         @default("created")
+  merchantReference         String         @unique
+  trackingId                String?        @unique
+  amount                    Float
+  currency                  String         @default("KES")
+  paymentMethod             String?
+  paymentAccount            String?
+  redirectUrl               String?
+  callbackUrl               String?
+  rawRequest                Json?
+  rawResponse               Json?
+  providerStatusCode        String?
+  providerStatusDescription String?
+  lastCheckedAt             DateTime?
+  completedAt               DateTime?
+  failedAt                  DateTime?
+  cancelledAt               DateTime?
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+  events                    PaymentEvent[]
+
+  @@index([bookingId])
+  @@index([invoiceId])
+  @@index([merchantReference])
+  @@index([trackingId])
+  @@index([status])
+  @@map("payment_attempts")
+}
+
+model PaymentEvent {
+  id               String         @id @default(cuid())
+  paymentAttemptId String
+  paymentAttempt   PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Cascade)
+  provider         String         @default("PESAPAL")
+  eventType        String
+  eventKey         String         @unique
+  payload          Json
+  status           String         @default("received")
+  createdAt        DateTime       @default(now())
+  processedAt      DateTime?
+
+  @@index([paymentAttemptId])
+  @@index([eventType])
+  @@map("payment_events")
+}
+
+model SGRTicket {
+  id               String   @id @default(uuid())
+  ticketNumber     String   @unique
+  route            String
+  trainNumber      String
+  class            String
+  seatNumber       String
+  departureTime    String
+  arrivalTime      String
+  passengerName    String
+  qrCode           String
+  bookingReference String
+  createdAt        DateTime @default(now())
+
+  @@index([ticketNumber])
+  @@index([bookingReference])
+  @@map("sgr_tickets")
+}
+
+model StaffUser {
+  id                     String          @id @default(uuid())
+  clerkUserId            String?         @unique
+  email                  String          @unique
+  fullName               String?
+  role                   StaffRole       @default(OPS)
+  active                 Boolean         @default(true)
+  lastSeenAt             DateTime?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  manualPaymentsReceived ManualPayment[] @relation("ManualPaymentReceiver")
+  expensesCreated        Expense[]       @relation("ExpenseCreator")
+  journalEntriesCreated  JournalEntry[]  @relation("JournalEntryCreator")
+  auditLogs              AuditLog[]      @relation("AuditLogActor")
+
+  @@index([role])
+  @@index([active])
+  @@map("staff_users")
+}
+
+model CatalogPackage {
+  id                 String              @id @default(uuid())
+  title              String
+  slug               String              @unique
+  subtitle           String
+  summary            String?
+  description        String
+  duration           Int
+  maxGroupSize       Int
+  difficulty         String              @default("Easy")
+  priceFrom          Float
+  currency           String              @default("USD")
+  locations          Json
+  itinerary          Json
+  inclusions         Json
+  exclusions         Json
+  highlights         Json
+  bestSeasons        Json
+  rating             Float               @default(0)
+  reviewCount        Int                 @default(0)
+  featured           Boolean             @default(false)
+  visibility         PackageVisibility   @default(DRAFT)
+  archivedAt         DateTime?
+  publishedAt        DateTime?
+  legacySourceId     String?             @unique
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  assets             PackageAsset[]
+  departures         Departure[]
+  bookings           Booking[]
+  analyticsEvents    AnalyticsEvent[]
+  expenseAllocations ExpenseAllocation[]
+
+  @@index([visibility])
+  @@index([featured])
+  @@map("catalog_packages")
+}
+
+model PackageAsset {
+  id                 String         @id @default(uuid())
+  packageId          String
+  url                String
+  alt                String
+  cloudinaryPublicId String?
+  sortOrder          Int            @default(0)
+  isPrimary          Boolean        @default(false)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  package            CatalogPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, sortOrder])
+  @@map("package_assets")
+}
+
+model Departure {
+  id                 String                 @id @default(uuid())
+  packageId          String
+  name               String?
+  code               String                 @unique
+  startDate          DateTime
+  endDate            DateTime
+  capacity           Int
+  status             DepartureStatus        @default(DRAFT)
+  pricePerPerson     Float?
+  currency           String                 @default("USD")
+  depositPercentage  Float                  @default(30)
+  notes              String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  package            CatalogPackage         @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  bookings           Booking[]
+  reservations       DepartureReservation[]
+  manualPayments     ManualPayment[]
+  expenseAllocations ExpenseAllocation[]
+  analyticsEvents    AnalyticsEvent[]
+
+  @@index([packageId, startDate])
+  @@index([status])
+  @@map("departures")
+}
+
+model DepartureReservation {
+  id          String                     @id @default(uuid())
+  departureId String
+  bookingId   String
+  guestsCount Int
+  status      DepartureReservationStatus @default(HOLD)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  departure   Departure                  @relation(fields: [departureId], references: [id], onDelete: Cascade)
+  booking     Booking                    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([departureId, bookingId])
+  @@index([bookingId])
+  @@map("departure_reservations")
+}
+
+model ManualPayment {
+  id                String         @id @default(uuid())
+  bookingId         String
+  invoiceId         String?
+  departureId       String?
+  channel           PaymentChannel
+  amount            Float
+  currency          String         @default("KES")
+  reference         String?
+  notes             String?
+  receivedAt        DateTime       @default(now())
+  receivedByStaffId String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  booking           Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  invoice           Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  departure         Departure?     @relation(fields: [departureId], references: [id], onDelete: SetNull)
+  receivedByStaff   StaffUser?     @relation("ManualPaymentReceiver", fields: [receivedByStaffId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+  @@index([invoiceId])
+  @@index([departureId])
+  @@index([channel])
+  @@index([receivedAt])
+  @@map("manual_payments")
+}
+
+model Vendor {
+  id        String       @id @default(uuid())
+  name      String       @unique
+  email     String?
+  phone     String?
+  status    VendorStatus @default(ACTIVE)
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  expenses  Expense[]
+
+  @@index([status])
+  @@map("vendors")
+}
+
+model Expense {
+  id               String              @id @default(uuid())
+  vendorId         String?
+  category         String
+  description      String
+  amount           Float
+  currency         String              @default("KES")
+  status           ExpenseStatus       @default(DRAFT)
+  incurredAt       DateTime            @default(now())
+  paidAt           DateTime?
+  notes            String?
+  createdByStaffId String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  vendor           Vendor?             @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  createdByStaff   StaffUser?          @relation("ExpenseCreator", fields: [createdByStaffId], references: [id], onDelete: SetNull)
+  allocations      ExpenseAllocation[]
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([incurredAt])
+  @@map("expenses")
+}
+
+model ExpenseAllocation {
+  id               String          @id @default(uuid())
+  expenseId        String
+  bookingId        String?
+  departureId      String?
+  catalogPackageId String?
+  amount           Float
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  expense          Expense         @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  booking          Booking?        @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  departure        Departure?      @relation(fields: [departureId], references: [id], onDelete: SetNull)
+  catalogPackage   CatalogPackage? @relation(fields: [catalogPackageId], references: [id], onDelete: SetNull)
+
+  @@index([expenseId])
+  @@index([bookingId])
+  @@index([departureId])
+  @@index([catalogPackageId])
+  @@map("expense_allocations")
+}
+
+model LedgerAccount {
+  id           String        @id @default(uuid())
+  code         String        @unique
+  name         String        @unique
+  type         AccountType
+  isSystem     Boolean       @default(false)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  journalLines JournalLine[]
+
+  @@index([type])
+  @@map("ledger_accounts")
+}
+
+model JournalEntry {
+  id               String        @id @default(uuid())
+  reference        String?       @unique
+  entryDate        DateTime      @default(now())
+  memo             String?
+  source           String
+  createdByStaffId String?
+  postedAt         DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  createdByStaff   StaffUser?    @relation("JournalEntryCreator", fields: [createdByStaffId], references: [id], onDelete: SetNull)
+  lines            JournalLine[]
+
+  @@index([entryDate])
+  @@index([source])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id          String        @id @default(uuid())
+  entryId     String
+  accountId   String
+  debit       Float         @default(0)
+  credit      Float         @default(0)
+  currency    String        @default("KES")
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  entry       JournalEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account     LedgerAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([entryId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+model AuditLog {
+  id           String     @id @default(uuid())
+  actorStaffId String?
+  action       String
+  entityType   String
+  entityId     String
+  payload      Json?
+  createdAt    DateTime   @default(now())
+  actorStaff   StaffUser? @relation("AuditLogActor", fields: [actorStaffId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model AnalyticsEvent {
+  id          String             @id @default(cuid())
+  eventKey    String?            @unique
+  eventType   AnalyticsEventType
+  path        String?
+  sessionKey  String
+  visitorKey  String?
+  referrer    String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  packageId   String?
+  departureId String?
+  bookingId   String?
+  metadata    Json?
+  occurredAt  DateTime           @default(now())
+  createdAt   DateTime           @default(now())
+  package     CatalogPackage?    @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  departure   Departure?         @relation(fields: [departureId], references: [id], onDelete: SetNull)
+  booking     Booking?           @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, occurredAt])
+  @@index([sessionKey])
+  @@index([packageId])
+  @@index([departureId])
+  @@index([bookingId])
+  @@map("analytics_events")
+}
+
+model DailyAnalyticsSnapshot {
+  id                String   @id @default(uuid())
+  date              DateTime @unique
+  visitors          Int      @default(0)
+  visits            Int      @default(0)
+  pageViews         Int      @default(0)
+  packageViews      Int      @default(0)
+  inquiryStarts     Int      @default(0)
+  checkoutStarts    Int      @default(0)
+  invoicesCreated   Int      @default(0)
+  paymentsCompleted Int      @default(0)
+  revenueAmount     Float    @default(0)
+  currency          String   @default("KES")
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("daily_analytics_snapshots")
+}
