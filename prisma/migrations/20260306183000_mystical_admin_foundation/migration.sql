@@ -1,4 +1,3 @@
-[dotenv@17.2.3] injecting env (9) from .env.local -- tip: ??  suppress all logs with { quiet: true }
 -- CreateEnum
 CREATE TYPE "StaffRole" AS ENUM ('ADMIN', 'OPS', 'FINANCE');
 
