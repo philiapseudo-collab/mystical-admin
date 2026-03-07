@@ -19,6 +19,15 @@ npm run dev
 
 Required environment variables are listed in [.env.example](D:\projects-2\mystical-admin\.env.example).
 
+## Media uploads
+
+Cloudinary uploads support either:
+
+1. `CLOUDINARY_URL`
+2. `CLOUDINARY_CLOUD_NAME` + `CLOUDINARY_API_KEY` + `CLOUDINARY_API_SECRET`
+
+Prefer `CLOUDINARY_URL` in Railway so the full credential set lives in one secret.
+
 ## Security model
 
 - Authentication is handled by Clerk.
