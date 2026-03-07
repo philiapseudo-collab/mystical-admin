@@ -2,6 +2,7 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 import type { StaffRole } from '@prisma/client';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { isAllowedStaffDomain } from '@/lib/security';
 
 export async function getOptionalClerkUser() {
   const authState = await auth();
@@ -24,6 +25,10 @@ export async function getOptionalStaffUser() {
   const email = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || user?.emailAddresses[0]?.emailAddress?.toLowerCase();
 
   if (!email) {
+    return null;
+  }
+
+  if (!isAllowedStaffDomain(email)) {
     return null;
   }
 

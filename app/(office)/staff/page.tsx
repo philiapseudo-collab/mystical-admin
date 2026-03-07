@@ -1,9 +1,11 @@
 import { requireStaff } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createStaffAccessAction } from '@/app/(office)/actions';
+import { getAllowedStaffDomains } from '@/lib/security';
 
 export default async function StaffPage() {
   await requireStaff(['ADMIN']);
+  const allowedDomains = getAllowedStaffDomains();
 
   const [staffUsers, auditLogs] = await Promise.all([
     prisma.staffUser.findMany({
@@ -25,8 +27,13 @@ export default async function StaffPage() {
         <p className="eyebrow mb-3">Staff Access</p>
         <h1 className="heading mb-4">Manage role-based access for Admin, Ops, and Finance users.</h1>
         <p className="max-w-3xl text-muted">
-          Sign-in is handled by Clerk, but only email addresses in this staff roster gain actual access to the admin back office.
+          Sign-in is handled by Clerk, but only invited email addresses in this staff roster gain actual access to the admin back office.
         </p>
+        {allowedDomains.length ? (
+          <p className="mt-3 text-sm text-muted">
+            Domain policy: invites and access are limited to <span className="font-semibold text-foreground">{allowedDomains.join(', ')}</span>.
+          </p>
+        ) : null}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
@@ -46,6 +53,10 @@ export default async function StaffPage() {
             <label className="flex items-center gap-3 rounded-2xl border border-line bg-white/75 px-4 py-3 text-sm">
               <input type="checkbox" name="active" defaultChecked />
               Active staff record
+            </label>
+            <label className="flex items-center gap-3 rounded-2xl border border-line bg-white/75 px-4 py-3 text-sm">
+              <input type="checkbox" name="sendInvite" defaultChecked />
+              Send or resend invitation email
             </label>
             <button type="submit" className="button-primary w-full">Save staff access</button>
           </form>

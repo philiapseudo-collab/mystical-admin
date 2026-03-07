@@ -1,10 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { clerkClient } from '@clerk/nextjs/server';
 import { Prisma, type PaymentChannel, type StaffRole } from '@prisma/client';
 import { requireStaff } from '@/lib/auth';
 import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { prisma } from '@/lib/prisma';
+import { isAllowedStaffDomain, normalizeEmail } from '@/lib/security';
 
 function parseText(value: FormDataEntryValue | null) {
   return typeof value === 'string' ? value.trim() : '';
@@ -33,6 +35,36 @@ function slugify(value: string) {
 function toDate(value: FormDataEntryValue | null) {
   const text = parseText(value);
   return text ? new Date(text) : null;
+}
+
+async function inviteStaffUser(email: string, role: StaffRole) {
+  const client = await clerkClient();
+  const existingUsers = await client.users.getUserList({
+    emailAddress: [email],
+    limit: 1,
+  });
+
+  if (existingUsers.totalCount > 0) {
+    return {
+      status: 'existing-user' as const,
+    };
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+  const invitation = await client.invitations.createInvitation({
+    emailAddress: email,
+    redirectUrl: `${appUrl}/sign-up`,
+    ignoreExisting: true,
+    publicMetadata: {
+      staffRole: role,
+      source: 'mystical-admin',
+    },
+  });
+
+  return {
+    status: 'invited' as const,
+    invitationId: invitation.id,
+  };
 }
 
 async function writeAuditLog(staffId: string, action: string, entityType: string, entityId: string, payload?: Prisma.JsonValue) {
@@ -454,32 +486,53 @@ export async function updateDepartureStatusAction(formData: FormData) {
 
 export async function createStaffAccessAction(formData: FormData) {
   const { staff } = await requireStaff(['ADMIN']);
-  const email = parseText(formData.get('email')).toLowerCase();
+  const email = normalizeEmail(parseText(formData.get('email')));
 
   if (!email) {
     throw new Error('Staff email is required');
   }
 
+  if (!isAllowedStaffDomain(email)) {
+    throw new Error('This email domain is not allowed by the current admin policy');
+  }
+
   const role = (parseText(formData.get('role')) || 'OPS') as StaffRole;
+  const active = formData.get('active') === 'on';
+  const sendInvite = formData.get('sendInvite') === 'on';
   const record = await prisma.staffUser.upsert({
     where: { email },
     update: {
       fullName: parseText(formData.get('fullName')) || null,
       role,
-      active: formData.get('active') === 'on',
+      active,
     },
     create: {
       email,
       fullName: parseText(formData.get('fullName')) || null,
       role,
-      active: formData.get('active') === 'on',
+      active,
     },
   });
+
+  let invitationResult:
+    | {
+        status: 'existing-user';
+      }
+    | {
+        status: 'invited';
+        invitationId: string;
+      }
+    | null = null;
+
+  if (active && sendInvite) {
+    invitationResult = await inviteStaffUser(email, role);
+  }
 
   await writeAuditLog(staff.id, 'staff.access.upserted', 'StaffUser', record.id, {
     email: record.email,
     role: record.role,
     active: record.active,
+    invitation: invitationResult,
   } as Prisma.JsonObject);
 
   revalidatePath('/staff');

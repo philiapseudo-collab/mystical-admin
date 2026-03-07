@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ClerkProvider, Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
+import { ClerkProvider, RedirectToTasks, Show, SignInButton, UserButton } from '@clerk/nextjs';
 import { Fraunces, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 
@@ -38,7 +38,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${spaceGrotesk.variable} ${fraunces.variable}`}>
-        <ClerkProvider>
+        <ClerkProvider taskUrls={{ 'setup-mfa': '/session-tasks/setup-mfa' }}>
+          <Show when="signed-in">
+            <RedirectToTasks />
+          </Show>
           <header className="border-b border-line bg-white/70 backdrop-blur-sm">
             <div className="shell flex items-center justify-between gap-4 py-4">
               <div>
@@ -49,9 +52,6 @@ export default function RootLayout({
                   <SignInButton mode="modal">
                     <button type="button" className="button-secondary">Sign in</button>
                   </SignInButton>
-                  <SignUpButton mode="modal">
-                    <button type="button" className="button-primary">Sign up</button>
-                  </SignUpButton>
                 </Show>
                 <Show when="signed-in">
                   <UserButton />

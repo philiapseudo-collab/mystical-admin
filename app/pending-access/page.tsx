@@ -14,8 +14,8 @@ export default async function PendingAccessPage() {
               <p className="eyebrow mb-3">Access Pending</p>
               <h1 className="heading mb-4">Your sign-in worked, but this account is not active in the staff roster yet.</h1>
               <p className="text-muted">
-                Ask an admin to add or activate <span className="font-semibold text-foreground">{email || 'your work email'}</span> inside
-                the staff access panel.
+                Mystical Admin is invite-only. Ask an admin to add or activate{' '}
+                <span className="font-semibold text-foreground">{email || 'your work email'}</span> inside the staff access panel.
               </p>
             </div>
           </div>
