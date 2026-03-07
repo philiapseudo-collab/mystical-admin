@@ -1,7 +1,18 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import type { StaffRole } from '@prisma/client';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+
+export async function getOptionalClerkUser() {
+  const authState = await auth();
+
+  if (!authState.userId) {
+    return null;
+  }
+
+  const client = await clerkClient();
+  return client.users.getUser(authState.userId);
+}
 
 export async function getOptionalStaffUser() {
   const authState = await auth();
@@ -9,8 +20,8 @@ export async function getOptionalStaffUser() {
     return null;
   }
 
-  const user = await currentUser();
-  const email = user?.emailAddresses[0]?.emailAddress?.toLowerCase();
+  const user = await getOptionalClerkUser();
+  const email = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || user?.emailAddresses[0]?.emailAddress?.toLowerCase();
 
   if (!email) {
     return null;
@@ -49,7 +60,7 @@ export async function requireStaff(allowedRoles?: StaffRole[]) {
     redirect('/sign-in');
   }
 
-  const user = await currentUser();
+  const user = await getOptionalClerkUser();
   const staff = await getOptionalStaffUser();
 
   if (!staff) {

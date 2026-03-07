@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ClerkProvider } from '@clerk/nextjs';
+import { ClerkProvider, Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
 import { Fraunces, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 
@@ -36,12 +36,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className={`${spaceGrotesk.variable} ${fraunces.variable}`}>
+    <html lang="en">
+      <body className={`${spaceGrotesk.variable} ${fraunces.variable}`}>
+        <ClerkProvider>
+          <header className="border-b border-line bg-white/70 backdrop-blur-sm">
+            <div className="shell flex items-center justify-between gap-4 py-4">
+              <div>
+                <p className="eyebrow">Mystical Admin</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Show when="signed-out">
+                  <SignInButton mode="modal">
+                    <button type="button" className="button-secondary">Sign in</button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button type="button" className="button-primary">Sign up</button>
+                  </SignUpButton>
+                </Show>
+                <Show when="signed-in">
+                  <UserButton />
+                </Show>
+              </div>
+            </div>
+          </header>
           {children}
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }

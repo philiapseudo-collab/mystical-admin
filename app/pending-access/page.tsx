@@ -1,10 +1,9 @@
 import Link from 'next/link';
-import { UserButton } from '@clerk/nextjs';
-import { currentUser } from '@clerk/nextjs/server';
+import { getOptionalClerkUser } from '@/lib/auth';
 
 export default async function PendingAccessPage() {
-  const user = await currentUser();
-  const email = user?.emailAddresses[0]?.emailAddress;
+  const user = await getOptionalClerkUser();
+  const email = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses[0]?.emailAddress;
 
   return (
     <main className="min-h-screen px-4 py-10">
@@ -19,7 +18,6 @@ export default async function PendingAccessPage() {
                 the staff access panel.
               </p>
             </div>
-            <UserButton />
           </div>
 
           <div className="flex flex-wrap gap-3">
