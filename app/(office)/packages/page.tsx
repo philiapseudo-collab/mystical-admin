@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { requireStaff } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { togglePackageVisibilityAction, upsertCatalogPackageAction } from '@/app/(office)/actions';
@@ -117,6 +118,9 @@ export default async function PackagesPage() {
                           <button type="submit" className="button-secondary">Move to draft</button>
                         </form>
                       )}
+                      <Link href={`/packages/${pkg.id}`} className="button-secondary">
+                        Edit
+                      </Link>
                     </div>
                   </td>
                 </tr>

@@ -268,6 +268,7 @@ export async function upsertCatalogPackageAction(formData: FormData) {
 
   revalidatePath('/dashboard');
   revalidatePath('/packages');
+  revalidatePath(`/packages/${packageRecord.id}`);
 }
 
 export async function togglePackageVisibilityAction(formData: FormData) {
@@ -296,6 +297,97 @@ export async function togglePackageVisibilityAction(formData: FormData) {
 
   revalidatePath('/dashboard');
   revalidatePath('/packages');
+  revalidatePath(`/packages/${packageRecord.id}`);
+}
+
+export async function setPrimaryPackageAssetAction(formData: FormData) {
+  const { staff } = await requireStaff(['ADMIN', 'OPS']);
+  const packageId = parseText(formData.get('packageId'));
+  const assetId = parseText(formData.get('assetId'));
+
+  if (!packageId || !assetId) {
+    throw new Error('Package id and asset id are required');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.packageAsset.updateMany({
+      where: {
+        packageId,
+      },
+      data: {
+        isPrimary: false,
+      },
+    });
+
+    await tx.packageAsset.update({
+      where: {
+        id: assetId,
+      },
+      data: {
+        isPrimary: true,
+      },
+    });
+  });
+
+  await writeAuditLog(staff.id, 'package.asset.primary.changed', 'CatalogPackage', packageId, {
+    assetId,
+  } as Prisma.JsonObject);
+
+  revalidatePath('/packages');
+  revalidatePath(`/packages/${packageId}`);
+}
+
+export async function removePackageAssetAction(formData: FormData) {
+  const { staff } = await requireStaff(['ADMIN', 'OPS']);
+  const packageId = parseText(formData.get('packageId'));
+  const assetId = parseText(formData.get('assetId'));
+
+  if (!packageId || !assetId) {
+    throw new Error('Package id and asset id are required');
+  }
+
+  const asset = await prisma.packageAsset.findUnique({
+    where: {
+      id: assetId,
+    },
+  });
+
+  if (!asset || asset.packageId !== packageId) {
+    throw new Error('Asset not found');
+  }
+
+  await prisma.packageAsset.delete({
+    where: {
+      id: assetId,
+    },
+  });
+
+  const nextPrimary = await prisma.packageAsset.findFirst({
+    where: {
+      packageId,
+    },
+    orderBy: {
+      sortOrder: 'asc',
+    },
+  });
+
+  if (nextPrimary) {
+    await prisma.packageAsset.update({
+      where: {
+        id: nextPrimary.id,
+      },
+      data: {
+        isPrimary: true,
+      },
+    });
+  }
+
+  await writeAuditLog(staff.id, 'package.asset.removed', 'CatalogPackage', packageId, {
+    assetId,
+  } as Prisma.JsonObject);
+
+  revalidatePath('/packages');
+  revalidatePath(`/packages/${packageId}`);
 }
 
 export async function createDepartureAction(formData: FormData) {
