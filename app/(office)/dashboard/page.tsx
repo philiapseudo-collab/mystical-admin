@@ -3,6 +3,12 @@ import { CalendarDays, Coins, CreditCard, Eye, Ticket, TrendingUp } from 'lucide
 import { requireStaff } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+function getUtcDayStart(date: Date) {
+  const normalized = new Date(date);
+  normalized.setUTCHours(0, 0, 0, 0);
+  return normalized;
+}
+
 function formatCurrency(amount: number, currency = 'KES') {
   return new Intl.NumberFormat('en-KE', {
     style: 'currency',
@@ -14,12 +20,14 @@ function formatCurrency(amount: number, currency = 'KES') {
 export default async function DashboardPage() {
   await requireStaff();
 
-  const today = startOfDay(new Date());
-  const monthStart = startOfMonth(new Date());
+  const now = new Date();
+  const analyticsDay = getUtcDayStart(now);
+  const today = startOfDay(now);
+  const monthStart = startOfMonth(now);
 
   const [todaySnapshot, departures, bookingsToday, recentBookings, dueInvoices, completedPayments, manualPayments, postedExpenses] =
     await Promise.all([
-      prisma.dailyAnalyticsSnapshot.findUnique({ where: { date: today } }),
+      prisma.dailyAnalyticsSnapshot.findUnique({ where: { date: analyticsDay } }),
       prisma.departure.findMany({ where: { status: 'OPEN' }, include: { reservations: true } }),
       prisma.booking.count({ where: { createdAt: { gte: today } } }),
       prisma.booking.findMany({

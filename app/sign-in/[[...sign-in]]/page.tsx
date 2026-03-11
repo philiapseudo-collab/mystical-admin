@@ -11,12 +11,15 @@ export default function SignInPage() {
             Staff access is invite-only. Use your approved work email to continue. If you can authenticate but still lack access,
             an admin needs to activate your staff role and send your invitation inside the back office.
           </p>
+          <p className="mt-4 max-w-2xl text-sm text-muted">
+            If Clerk says it cannot find your account, your staff record exists in the admin roster but the Clerk invitation has not
+            been completed yet. Open the invite email first, then finish sign-up from that secure link.
+          </p>
         </section>
         <section className="panel p-6 md:p-8">
           <SignIn
             routing="path"
             path="/sign-in"
-            signUpUrl="/sign-up"
             fallbackRedirectUrl="/dashboard"
             forceRedirectUrl="/dashboard"
             appearance={{

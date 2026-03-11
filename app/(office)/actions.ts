@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { clerkClient } from '@clerk/nextjs/server';
 import { Prisma, type PaymentChannel, type StaffRole } from '@prisma/client';
 import { requireStaff } from '@/lib/auth';
+import { getAppUrl } from '@/lib/app-url';
 import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { prisma } from '@/lib/prisma';
 import { isAllowedStaffDomain, normalizeEmail } from '@/lib/security';
@@ -50,7 +51,7 @@ async function inviteStaffUser(email: string, role: StaffRole) {
     };
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+  const appUrl = getAppUrl();
   const invitation = await client.invitations.createInvitation({
     emailAddress: email,
     redirectUrl: `${appUrl}/sign-up`,

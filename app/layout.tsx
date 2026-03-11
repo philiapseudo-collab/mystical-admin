@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ClerkProvider, RedirectToTasks, Show, SignInButton, UserButton } from '@clerk/nextjs';
 import { Fraunces, Space_Grotesk } from 'next/font/google';
+import { getAppUrl } from '@/lib/app-url';
 import './globals.css';
 
 const spaceGrotesk = Space_Grotesk({
@@ -13,7 +14,7 @@ const fraunces = Fraunces({
   variable: '--font-fraunces',
 });
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+const appUrl = getAppUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
