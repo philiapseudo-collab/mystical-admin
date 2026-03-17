@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { requireStaff } from '@/lib/auth';
+import { getBookingJourneyLabel } from '@/lib/bookings';
 import { prisma } from '@/lib/prisma';
 
 function formatCurrency(amount: number, currency = 'KES') {
@@ -10,7 +12,7 @@ function formatCurrency(amount: number, currency = 'KES') {
 }
 
 export default async function BookingsPage() {
-  await requireStaff(['ADMIN', 'OPS']);
+  const { staff } = await requireStaff(['ADMIN', 'OPS']);
 
   const bookings = await prisma.booking.findMany({
     include: {
@@ -32,12 +34,21 @@ export default async function BookingsPage() {
   return (
     <div className="space-y-6">
       <section className="panel-strong p-8">
-        <p className="eyebrow mb-3">Booking Operations</p>
-        <h1 className="heading mb-4">Track website and manual bookings with their linked departures, invoices, and payment progress.</h1>
-        <p className="max-w-3xl text-muted">
-          The booking list below is sourced from the same records the public website writes into. Manual payments and departure links are
-          visible here so operations can reconcile space and traveler status quickly.
-        </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="eyebrow mb-3">Booking Operations</p>
+            <h1 className="heading mb-4">Track website and manual bookings with their linked departures, invoices, and payment progress.</h1>
+            <p className="max-w-3xl text-muted">
+              The booking list below is sourced from the same records the public website writes into. Manual payments and departure links are
+              visible here so operations can reconcile space and traveler status quickly.
+            </p>
+          </div>
+          {staff.role === 'ADMIN' && (
+            <Link href="/bookings/new" className="button-primary">
+              New manual booking
+            </Link>
+          )}
+        </div>
       </section>
 
       <section className="panel p-6">
@@ -60,7 +71,7 @@ export default async function BookingsPage() {
                     <div className="font-medium">{booking.bookingReference}</div>
                     <div className="text-xs text-muted">{booking.channel}</div>
                   </td>
-                  <td>{booking.catalogPackage?.title || 'Manual / mixed booking'}</td>
+                  <td>{getBookingJourneyLabel({ catalogPackageTitle: booking.catalogPackage?.title, items: booking.items, guestDetails: booking.guestDetails })}</td>
                   <td>{booking.departure?.code || 'No departure linked'}</td>
                   <td>
                     <div className="space-y-1">
@@ -72,7 +83,7 @@ export default async function BookingsPage() {
                     <div className="space-y-2">
                       {booking.invoices.map((invoice) => (
                         <div key={invoice.id} className="text-xs text-muted">
-                          <span className="font-semibold text-foreground">{invoice.invoiceNumber}</span> · {invoice.type} · {invoice.status} ·{' '}
+                          <span className="font-semibold text-foreground">{invoice.invoiceNumber}</span> - {invoice.type} - {invoice.status} -{' '}
                           {formatCurrency(invoice.dueAmount, invoice.currency)}
                         </div>
                       ))}
@@ -83,8 +94,7 @@ export default async function BookingsPage() {
                     <div className="space-y-2">
                       {booking.manualPayments.map((payment) => (
                         <div key={payment.id} className="text-xs text-muted">
-                          <span className="font-semibold text-foreground">{payment.channel}</span> ·{' '}
-                          {formatCurrency(payment.amount, payment.currency)}
+                          <span className="font-semibold text-foreground">{payment.channel}</span> - {formatCurrency(payment.amount, payment.currency)}
                         </div>
                       ))}
                       {booking.manualPayments.length === 0 && <span className="text-xs text-muted">None</span>}

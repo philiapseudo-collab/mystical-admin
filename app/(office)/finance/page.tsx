@@ -1,4 +1,6 @@
+import { startOfMonth } from 'date-fns';
 import { requireStaff } from '@/lib/auth';
+import { getBookingJourneyLabel } from '@/lib/bookings';
 import { prisma } from '@/lib/prisma';
 import { createExpenseAction, createVendorAction, recordManualPaymentAction } from '@/app/(office)/actions';
 
@@ -24,6 +26,7 @@ function formatDate(value: Date | null | undefined) {
 
 export default async function FinancePage() {
   await requireStaff(['ADMIN', 'FINANCE']);
+  const monthStart = startOfMonth(new Date());
 
   const [
     vendors,
@@ -40,6 +43,8 @@ export default async function FinancePage() {
     completedPaymentTotals,
     postedExpenseTotals,
     outstandingTotals,
+    ownerDistributionTotals,
+    ownerDistributions,
   ] = await Promise.all([
     prisma.vendor.findMany({ orderBy: { name: 'asc' } }),
     prisma.catalogPackage.findMany({
@@ -138,6 +143,23 @@ export default async function FinancePage() {
         dueAmount: true,
       },
     }),
+    prisma.ownerDistribution.aggregate({
+      where: {
+        paidAt: { gte: monthStart },
+      },
+      _sum: {
+        amount: true,
+      },
+    }),
+    prisma.ownerDistribution.findMany({
+      include: {
+        booking: true,
+      },
+      orderBy: {
+        paidAt: 'desc',
+      },
+      take: 15,
+    }),
   ]);
 
   const cashIn =
@@ -146,6 +168,7 @@ export default async function FinancePage() {
   const cashOut = postedExpenseTotals._sum.amount || 0;
   const outstandingReceivables = outstandingTotals._sum.dueAmount || 0;
   const netCash = cashIn - cashOut;
+  const ownerPayouts = ownerDistributionTotals._sum.amount || 0;
 
   return (
     <div className="space-y-6">
@@ -157,7 +180,7 @@ export default async function FinancePage() {
         </p>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <article className="panel p-5">
           <p className="eyebrow mb-2">Cash in</p>
           <p className="font-display text-4xl">{formatCurrency(cashIn)}</p>
@@ -172,6 +195,11 @@ export default async function FinancePage() {
           <p className="eyebrow mb-2">Net cash</p>
           <p className="font-display text-4xl">{formatCurrency(netCash)}</p>
           <p className="mt-2 text-sm text-muted">Operational inflow minus posted outflow.</p>
+        </article>
+        <article className="panel p-5">
+          <p className="eyebrow mb-2">Owner payouts</p>
+          <p className="font-display text-4xl">{formatCurrency(ownerPayouts)}</p>
+          <p className="mt-2 text-sm text-muted">Tracked separately from operating expenses and margin.</p>
         </article>
         <article className="panel p-5">
           <p className="eyebrow mb-2">Receivables</p>
@@ -491,6 +519,49 @@ export default async function FinancePage() {
             )}
           </div>
         </article>
+      </section>
+
+      <section className="panel p-6">
+        <div className="mb-5">
+          <p className="eyebrow mb-2">Owner distributions</p>
+          <h2 className="font-display text-3xl">Payouts tracked outside operating expenses</h2>
+        </div>
+        <div className="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>Booking</th>
+                <th>Recipient</th>
+                <th>Paid on</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ownerDistributions.map((distribution) => (
+                <tr key={distribution.id}>
+                  <td>
+                    <div className="font-medium">{distribution.booking.bookingReference}</div>
+                    <div className="text-xs text-muted">
+                      {getBookingJourneyLabel({
+                        catalogPackageTitle: null,
+                        items: distribution.booking.items,
+                        guestDetails: distribution.booking.guestDetails,
+                      })}
+                    </div>
+                  </td>
+                  <td>{distribution.recipientName}</td>
+                  <td>{formatDate(distribution.paidAt || distribution.createdAt)}</td>
+                  <td>{formatCurrency(distribution.amount, distribution.currency)}</td>
+                </tr>
+              ))}
+              {ownerDistributions.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-center text-muted">No owner distributions recorded yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

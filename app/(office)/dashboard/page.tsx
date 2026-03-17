@@ -1,6 +1,7 @@
 import { startOfDay, startOfMonth } from 'date-fns';
 import { CalendarDays, Coins, CreditCard, Eye, Ticket, TrendingUp } from 'lucide-react';
 import { requireStaff } from '@/lib/auth';
+import { getBookingJourneyLabel } from '@/lib/bookings';
 import { prisma } from '@/lib/prisma';
 
 function getUtcDayStart(date: Date) {
@@ -122,7 +123,13 @@ export default async function DashboardPage() {
                   <tr key={booking.id}>
                     <td>{booking.bookingReference}</td>
                     <td>
-                      <div className="font-medium">{booking.catalogPackage?.title || 'Manual / mixed booking'}</div>
+                      <div className="font-medium">
+                        {getBookingJourneyLabel({
+                          catalogPackageTitle: booking.catalogPackage?.title,
+                          items: booking.items,
+                          guestDetails: booking.guestDetails,
+                        })}
+                      </div>
                       <div className="text-xs text-muted">{booking.channel}</div>
                     </td>
                     <td><span className="pill">{booking.status}</span></td>

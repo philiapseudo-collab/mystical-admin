@@ -95,6 +95,7 @@ model Booking {
   departureReservations DepartureReservation[]
   manualPayments        ManualPayment[]
   expenseAllocations    ExpenseAllocation[]
+  ownerDistributions    OwnerDistribution[]
   analyticsEvents       AnalyticsEvent[]
 
   @@index([bookingReference])
@@ -270,6 +271,7 @@ model StaffUser {
   updatedAt              DateTime        @updatedAt
   manualPaymentsReceived ManualPayment[] @relation("ManualPaymentReceiver")
   expensesCreated        Expense[]       @relation("ExpenseCreator")
+  ownerDistributionsCreated OwnerDistribution[] @relation("OwnerDistributionCreator")
   journalEntriesCreated  JournalEntry[]  @relation("JournalEntryCreator")
   auditLogs              AuditLog[]      @relation("AuditLogActor")
 
@@ -461,6 +463,26 @@ model ExpenseAllocation {
   @@index([departureId])
   @@index([catalogPackageId])
   @@map("expense_allocations")
+}
+
+model OwnerDistribution {
+  id               String      @id @default(uuid())
+  bookingId        String
+  recipientName    String
+  amount           Float
+  currency         String      @default("KES")
+  paidAt           DateTime?
+  notes            String?
+  createdByStaffId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  booking          Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdByStaff   StaffUser?  @relation("OwnerDistributionCreator", fields: [createdByStaffId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+  @@index([paidAt])
+  @@index([createdByStaffId])
+  @@map("owner_distributions")
 }
 
 model LedgerAccount {
